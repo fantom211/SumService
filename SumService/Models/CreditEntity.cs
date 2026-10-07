@@ -17,24 +17,34 @@ namespace SumService.Models
         [MaxLength(200)]
         public string Name { get; set; } = string.Empty;
 
+        //сумма кредита
         [Required]
         [Precision(20,2)]
         public decimal PrincipalAmount { get; set; }
 
+        //кредитная ставка
         [Required]
         [Precision(5,2)]
         public decimal InterestRate { get; set; }
 
-        [Required]
-        public int TermInMonth { get; set; }
 
+        //срок кредита в месяцах
+        [Required]
+        public int TermInMonths { get; set; }
+
+
+        //тип кредита
         [Required]
         public PaymentType PaymentType { get; set; }    
+        
 
+        //общая переплата
         [Required]
         [Precision(20,2)]
         public decimal TotalInterest { get; set; }
 
+
+        //общая сумма выплат
         [Required]
         [Precision(20, 2)]
         public decimal TotalRepaymentAmount { get; set; }

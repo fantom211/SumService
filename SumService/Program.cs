@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using SumService.Data;
+using SumService.Service;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -9,6 +10,8 @@ builder.Services.AddDbContext<CreditDbContext>(options =>
     options.UseNpgsql(
         builder.Configuration.GetConnectionString("CreditDbConnection")
     ));
+
+builder.Services.AddScoped<CreditCalculationService>();
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
