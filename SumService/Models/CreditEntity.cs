@@ -36,18 +36,6 @@ namespace SumService.Models
         //тип кредита
         [Required]
         public PaymentType PaymentType { get; set; }    
-        
-
-        //общая переплата
-        [Required]
-        [Precision(20,2)]
-        public decimal TotalInterest { get; set; }
-
-
-        //общая сумма выплат
-        [Required]
-        [Precision(20, 2)]
-        public decimal TotalRepaymentAmount { get; set; }
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
