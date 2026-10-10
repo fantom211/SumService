@@ -1,9 +1,123 @@
-﻿using SumService.Models;
+﻿using Microsoft.EntityFrameworkCore;
+using SumService.Data;
+using SumService.Models;
+using SumService.Models.DTOs;
+using SumService.Services;
 
 namespace SumService.Service
 {
     public class CreditCalculationService
     {
+        private readonly CreditDbContext _context;
+
+        public CreditCalculationService(CreditDbContext context)
+        {
+            _context = context;
+        }
+
+        public async Task<List<CreditResponseDto>> GetAllAsync(Guid userId)
+        {
+            var credits = await _context.Credits
+                .Include(c => c.PaymentSchedule)
+                .Where(c => c.UserId == userId)
+                .ToListAsync();
+
+            return credits
+                .Select(CreditMapper.ToDto)
+                .ToList();
+        }
+
+        public async Task<CreditResponseDto> GetByIdAsync(Guid id)
+        {
+            var credit = await _context.Credits
+                .Include(x=>x.PaymentSchedule)
+                .FirstOrDefaultAsync(x => x.Id == id);
+            if (credit == null)
+                throw new KeyNotFoundException("Такого кредита нет.");
+            return CreditMapper.ToDto(credit);
+        }
+
+        public async Task<CreditResponseDto> CreateAsync(CreditCreateDto dto, Guid userId)
+        {
+            CreditOfferEntity? offer = null;
+            decimal interestRate = dto.InterestRate;
+
+            if(dto.CreditOfferId.HasValue)
+            {
+                offer = await _context.CreditOffers
+                    .FirstOrDefaultAsync(x => x.Id == dto.CreditOfferId.Value);
+
+                if (offer is null)
+                {
+                    throw new KeyNotFoundException("Кредитное предложение не найдено."); 
+                }
+
+                interestRate = offer.InterestRate;
+
+                if (offer.InterestRate != dto.InterestRate)
+                    throw new Exception("Ваша процентная ставка не соответсвует офферу");
+                if (offer.MinTermInMonths > dto.TermInMonths)
+                    throw new Exception("Слишком маленький срок кредита.");
+                if (offer.MaxTermInMonths < dto.TermInMonths)
+                    throw new Exception("Слишком большой срок кредита.");
+            }
+
+            var credit = CreditMapper.ToEntity(dto, interestRate, offer, userId);
+
+            var schedule = CalculateSchedule(credit);
+
+            credit.PaymentSchedule = schedule;
+
+            _context.Credits.Add(credit);
+            await _context.SaveChangesAsync();
+
+            return CreditMapper.ToDto(credit);
+
+            
+        }
+
+        public async Task CalculateCreditAsync(CreditCreateDto dto, Guid userId)
+        {
+            CreditOfferEntity? offer = null;
+            decimal interestRate = dto.InterestRate;
+
+            if (dto.CreditOfferId.HasValue)
+            {
+                offer = await _context.CreditOffers
+                    .FirstOrDefaultAsync(x => x.Id == dto.CreditOfferId.Value);
+
+                if (offer is null)
+                {
+                    throw new KeyNotFoundException("Кредитное предложение не найдено.");
+                }
+                interestRate = offer.InterestRate;
+
+                if (offer.InterestRate != dto.InterestRate)
+                    throw new Exception("Ваша процентная ставка не соответсвует офферу");
+                if (offer.MinTermInMonths > dto.TermInMonths)
+                    throw new Exception("Слишком маленький срок кредита.");
+                if (offer.MaxTermInMonths < dto.TermInMonths)
+                    throw new Exception("Слишком большой срок кредита.");
+            }
+
+            var credit = new CreditEntity
+            {
+                UserId = userId,
+                CreditOfferId = offer?.Id,
+                CreditOffer = offer,
+                Name = string.IsNullOrWhiteSpace(dto.Name) ? "Мой кредит" : dto.Name.Trim(),
+                PrincipalAmount = dto.PrincipalAmount,
+                InterestRate = interestRate,
+                TermInMonths = dto.TermInMonths,
+                PaymentType = dto.PaymentType,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            credit.PaymentSchedule = CalculateSchedule(credit);
+        }
+
+
+
         public List<PaymentScheduleEntity> CalculateSchedule(CreditEntity credit)
         {
             return credit.PaymentType switch
@@ -54,8 +168,7 @@ namespace SumService.Service
                     });
                 }
 
-                return schedule;
-                
+                return schedule; 
             }
             decimal factor = (decimal)Math.Pow((double)(1 + monthlyRate), months);
 
@@ -144,5 +257,7 @@ namespace SumService.Service
             }
             return schedule;
         }
+
+        
     }
 }
